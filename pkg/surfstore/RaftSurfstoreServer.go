@@ -3,6 +3,7 @@ package surfstore
 import (
 	context "context"
 	"fmt"
+	"log"
 	"sync"
 
 	grpc "google.golang.org/grpc"
@@ -82,6 +83,10 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
+	if !s.isLeader {
+		return nil, ERR_NOT_LEADER
+	}
+
 	// append entry to our log
 	s.log = append(s.log, &UpdateOperation{
 		Term:         s.term,
@@ -94,76 +99,89 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 
 	go s.sendToAllFollowersInParallel(ctx)
 
-	// keep trying indefinitely (even after responding) ** rely on sendheartbeat
+	// keep trying indefinitely (even after responding) ** use for loop in func sendToFollower
 
 	// commit the entry once majority of followers have it in their log
 	commit := <-commitChan
 
 	// once committed, apply to the state machine
 	if commit {
+		s.lastApplied = s.commitIndex // s.lastApplied not needed for leader?
 		return s.metaStore.UpdateFile(ctx, filemeta)
 	}
 
 	return nil, nil
-	return nil, nil
 }
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
-	// send entry to all my followers and count the replies
+	//in case of another client call updateFile before this goroutine finished
+	targetInd := s.commitIndex + 1
+	pendingInd := len(s.pendingCommits) - 1
 
+	// send entry to all my followers and count the replies
 	responses := make(chan bool, len(s.peers)-1)
 	// contact all the follower, send some AppendEntries call
 	for idx, addr := range s.peers {
 		if int64(idx) == s.id {
 			continue
 		}
-
-		go s.sendToFollower(ctx, addr, responses)
+		go s.sendToFollower(ctx, targetInd, addr, responses)
 	}
 
-	totalResponses := 1
 	totalAppends := 1
 
 	// wait in loop for responses
 	for {
 		result := <-responses
-		totalResponses++
 		if result {
 			totalAppends++
 		}
-		if totalResponses == len(s.peers) {
+
+		if totalAppends > len(s.peers)/2 {
+			// put on corresponding channel
+			*s.pendingCommits[pendingInd] <- true
+			// update commit Index correctly
+			s.commitIndex = targetInd
 			break
 		}
 	}
 
-	if totalAppends > len(s.peers)/2 {
-		// TODO put on correct channel
-		*s.pendingCommits[0] <- true
-		// TODO update commit Index correctly
-		s.commitIndex = 0
-	}
 }
 
-func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, responses chan bool) {
+func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, addr string, responses chan bool) {
+	for { //keep trying
+		AppendEntriesInput := AppendEntryInput{
+			Term: s.term,
+			// TODO put the right values
+			PrevLogIndex: targetInd - 1,
+			//PrevLogTerm:  -1,
+			Entries:      s.log[:targetInd+1],
+			LeaderCommit: s.commitIndex,
+		}
+		if AppendEntriesInput.PrevLogTerm > 0 {
+			AppendEntriesInput.PrevLogTerm = s.log[AppendEntriesInput.PrevLogTerm].Term
+		}
 
-	dummyAppendEntriesInput := AppendEntryInput{
-		Term: s.term,
-		// TODO put the right values
-		PrevLogTerm:  -1,
-		PrevLogIndex: -1,
-		Entries:      s.log,
-		LeaderCommit: s.commitIndex,
+		// TODO check all errors
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		client := NewRaftSurfstoreClient(conn)
+
+		output, err := client.AppendEntries(ctx, &AppendEntriesInput)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		//  check output
+		if output.Success {
+			responses <- true
+			break
+		}
 	}
-
-	// TODO check all errors
-	conn, _ := grpc.Dial(addr, grpc.WithInsecure())
-	client := NewRaftSurfstoreClient(conn)
-
-	_, _ = client.AppendEntries(ctx, &dummyAppendEntriesInput)
-
-	// TODO check output
-	responses <- true
-
 }
 
 // 1. Reply false if term < currentTerm (§5.1)
@@ -206,13 +224,23 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// 4. Append any new entries not already in the log
 	s.log = append(s.log, input.Entries...)
 
-	for s.lastApplied < input.LeaderCommit {
+	// 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+	if input.LeaderCommit > s.commitIndex {
+		if input.LeaderCommit < int64(len(s.log)-1) {
+			s.commitIndex = input.LeaderCommit
+		} else {
+			s.commitIndex = int64(len(s.log) - 1)
+		}
+	}
+
+	//Apply to state machine
+	for s.lastApplied < s.commitIndex {
 		entry := s.log[s.lastApplied+1]
 		s.metaStore.UpdateFile(ctx, entry.FileMetaData)
 		s.lastApplied++
 	}
-
-	return nil, nil
+	output.Success = true
+	return output, nil
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
