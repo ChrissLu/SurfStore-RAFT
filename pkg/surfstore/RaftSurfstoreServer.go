@@ -152,9 +152,9 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, add
 	for { //keep trying
 		AppendEntriesInput := AppendEntryInput{
 			Term: s.term,
-			// TODO put the right values
+			// put the right values
 			PrevLogIndex: targetInd - 1,
-			//PrevLogTerm:  -1,
+			PrevLogTerm:  -1,
 			Entries:      s.log[:targetInd+1],
 			LeaderCommit: s.commitIndex,
 		}
@@ -162,7 +162,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, add
 			AppendEntriesInput.PrevLogTerm = s.log[AppendEntriesInput.PrevLogTerm].Term
 		}
 
-		// TODO check all errors
+		// check all errors
 		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
 			log.Println(err)
@@ -217,9 +217,29 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term
 	// matches prevLogTerm (§5.3)
+	if len(s.log) <= int(input.PrevLogIndex) {
+		return output, fmt.Errorf("log does not contain an entry at prevLogIndex")
+	} else if input.PrevLogIndex > -1 && s.log[input.PrevLogIndex].Term != input.PrevLogTerm {
+		return output, fmt.Errorf("wrong PrevLogTerm")
+	}
 
 	// 3. If an existing entry conflicts with a new one (same index but different
 	// terms), delete the existing entry and all that follow it (§5.3)
+	for ind, entry := range s.log {
+		if ind > len(input.Entries)-1 {
+			s.log = s.log[:ind]
+			input.Entries = make([]*UpdateOperation, 0)
+			break
+		}
+		if entry != input.Entries[ind] {
+			s.log = s.log[:ind]
+			input.Entries = input.Entries[ind:]
+			break
+		}
+		if ind == len(s.log)-1 { //all match
+			input.Entries = input.Entries[len(s.log):]
+		}
+	}
 
 	// 4. Append any new entries not already in the log
 	s.log = append(s.log, input.Entries...)

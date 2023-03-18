@@ -51,11 +51,12 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 		isCrashed:      false,
 		isCrashedMutex: &isCrashedMutex,
 
-		peers:       config.RaftAddrs,
-		ip:          config.RaftAddrs[id],
-		id:          id,
-		lastApplied: -1,
-		commitIndex: -1,
+		peers:          config.RaftAddrs,
+		ip:             config.RaftAddrs[id],
+		id:             id,
+		lastApplied:    -1,
+		commitIndex:    -1,
+		pendingCommits: make([]*chan bool, 0),
 	}
 
 	return &server, nil
