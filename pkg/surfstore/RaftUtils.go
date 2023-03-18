@@ -51,9 +51,9 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 		isCrashed:      false,
 		isCrashedMutex: &isCrashedMutex,
 
-		peers:          config.RaftAddrs,
-		ip:             config.RaftAddrs[id],
-		id:             id,
+		peers: config.RaftAddrs,
+		//ip:             config.RaftAddrs[id],
+		serverId:       id,
 		lastApplied:    -1,
 		commitIndex:    -1,
 		pendingCommits: make([]*chan bool, 0),
@@ -64,7 +64,7 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 
 // TODO Start up the Raft server and any services here
 func ServeRaftServer(server *RaftSurfstore) error {
-	listener, err := net.Listen("tcp", server.ip)
+	listener, err := net.Listen("tcp", server.peers[server.serverId])
 	if err != nil {
 		return fmt.Errorf("failed to listen %v", err)
 	}

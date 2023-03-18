@@ -107,7 +107,7 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 	FIM, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
 	if err != nil {
 		conn.Close()
-		println(999)
+		println(err.Error())
 		return err
 	}
 	*serverFileInfoMap = FIM.FileInfoMap
@@ -167,6 +167,7 @@ func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStore
 	if err != nil {
 		conn.Close()
 		//print("222222222222222")
+		println(err.Error())
 		return err
 	}
 	tempMap := make(map[string][]string)
