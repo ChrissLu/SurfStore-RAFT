@@ -32,24 +32,53 @@ type RaftSurfstore struct {
 }
 
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
-	panic("todo")
-	return nil, nil
+	if !s.isLeader {
+		return nil, ERR_NOT_LEADER
+	}
+
+	// waiting for majority to be alive
+	for {
+		success, _ := s.SendHeartbeat(ctx, empty)
+		if success.Flag {
+			break
+		}
+	}
+
+	return s.metaStore.GetFileInfoMap(ctx, empty)
 }
 
 func (s *RaftSurfstore) GetBlockStoreMap(ctx context.Context, hashes *BlockHashes) (*BlockStoreMap, error) {
-	if s.isLeader {
-		return s.metaStore.GetBlockStoreMap(ctx, hashes)
-	} else {
+	if !s.isLeader {
 		return nil, ERR_NOT_LEADER
 	}
+
+	// waiting for majority to be alive
+	for {
+		success, _ := s.SendHeartbeat(ctx, &emptypb.Empty{})
+		if success.Flag {
+			break
+		}
+	}
+
+	return s.metaStore.GetBlockStoreMap(ctx, hashes)
+
 }
 
 func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.Empty) (*BlockStoreAddrs, error) {
-	if s.isLeader {
-		return s.metaStore.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
-	} else {
+	if !s.isLeader {
 		return nil, ERR_NOT_LEADER
 	}
+
+	// waiting for majority to be alive
+	for {
+		success, _ := s.SendHeartbeat(ctx, empty)
+		if success.Flag {
+			break
+		}
+	}
+
+	return s.metaStore.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
+
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
@@ -146,8 +175,15 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, addr string, respons
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
+	output := &AppendEntryOutput{
+		ServerId:     s.id,
+		Term:         s.term,
+		Success:      false,
+		MatchedIndex: -1,
+	}
+
 	if s.isCrashed {
-		return nil, ERR_SERVER_CRASHED
+		return output, ERR_SERVER_CRASHED
 	}
 
 	if input.Term > s.term {
@@ -156,9 +192,19 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		s.isLeaderMutex.Unlock()
 		s.term = input.Term
 	}
+	// 1. Reply false if term < currentTerm (§5.1)
+	if input.Term > s.term {
+		return output, fmt.Errorf("append from leader with wrong term")
+	}
 
-	// TODO actually check entries
-	s.log = input.Entries
+	// 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term
+	// matches prevLogTerm (§5.3)
+
+	// 3. If an existing entry conflicts with a new one (same index but different
+	// terms), delete the existing entry and all that follow it (§5.3)
+
+	// 4. Append any new entries not already in the log
+	s.log = append(s.log, input.Entries...)
 
 	for s.lastApplied < input.LeaderCommit {
 		entry := s.log[s.lastApplied+1]
@@ -170,6 +216,9 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 }
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
+	if s.isCrashed {
+		return &Success{Flag: false}, ERR_SERVER_CRASHED
+	}
 	s.isLeaderMutex.Lock()
 	defer s.isLeaderMutex.Unlock()
 	s.isLeader = true
