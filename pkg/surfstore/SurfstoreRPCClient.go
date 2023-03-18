@@ -3,6 +3,7 @@ package surfstore
 import (
 	context "context"
 	"time"
+	//"fmt"
 
 	grpc "google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -130,6 +131,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		return err
 	}
 	*latestVersion = v.Version
+	//fmt.Println(77777)
 	return conn.Close()
 }
 

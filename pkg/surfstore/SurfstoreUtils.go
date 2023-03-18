@@ -88,16 +88,18 @@ func ClientSync(client RPCClient) {
 	if err != nil {
 		log.Println("Error getting remote block store addrs", err.Error())
 	}
-
+	//println("****************")
 	//download
 	for filename, RemoteMetaData := range RemoteMap {
 		err = nil
 		if LocalMetaData, ok := LocalMap[filename]; ok {
 			if RemoteMetaData.Version >= LocalMap[filename].Version {
+				println(3)
 				err = downloadFile(client, RemoteMetaData, LocalMetaData, addrs)
 			}
 		} else {
 			LocalMap[filename] = &FileMetaData{}
+			println(4)
 			err = downloadFile(client, RemoteMetaData, LocalMap[filename], addrs)
 		}
 
@@ -105,23 +107,25 @@ func ClientSync(client RPCClient) {
 			log.Println("Error downloading:", err.Error())
 		}
 	}
-
+	//println("------------------")
 	//upload
 	for filename2, LocalMetaData := range LocalMap {
 		err = nil
 		if RemoteMetaData, ok := RemoteMap[filename2]; ok {
 			if LocalMetaData.Version > RemoteMetaData.Version {
+				println(1)
 				err = uploadFile(client, LocalMetaData, addrs)
 			}
 		} else {
 			//new file in local
+			println(2)
 			err = uploadFile(client, LocalMetaData, addrs)
 		}
 		if err != nil {
 			log.Println("Error uploading: ", err.Error())
 		}
 	}
-
+	//println("^^^^^^^^^^^^^")
 	WriteMetaFile(LocalMap, client.BaseDir)
 
 }
@@ -192,9 +196,10 @@ func uploadFile(client RPCClient, LocalMetaData *FileMetaData, blockAddrs []stri
 	}
 
 	// }
-
+	//fmt.Println("WWWWWWWW")
 	client.UpdateFile(LocalMetaData, &latestVersion)
 	//fmt.Println(LocalMetaData.BlockHashList)
+	//fmt.Println(6666666)
 	if err != nil {
 		return err
 	} else if latestVersion == -1 {
