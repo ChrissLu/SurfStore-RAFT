@@ -3,20 +3,21 @@ package surfstore
 import (
 	context "context"
 	"fmt"
+	"sync"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type BlockStore struct {
 	BlockMap map[string]*Block
-	//mtx      sync.Mutex
+	mtx      sync.Mutex
 	UnimplementedBlockStoreServer
 }
 
 func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Block, error) {
-	//bs.mtx.Lock()
+	bs.mtx.Lock()
 	block, ok := bs.BlockMap[blockHash.Hash]
-	//bs.mtx.Unlock()
+	bs.mtx.Unlock()
 	if !ok {
 		return &Block{}, fmt.Errorf("no block found")
 	}
@@ -26,9 +27,9 @@ func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Bloc
 
 func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, error) {
 	hash := GetBlockHashString(block.BlockData)
-	//bs.mtx.Lock()
+	bs.mtx.Lock()
 	bs.BlockMap[hash] = block
-	//bs.mtx.Unlock()
+	bs.mtx.Unlock()
 	return &Success{Flag: true}, nil
 }
 
@@ -37,11 +38,11 @@ func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, err
 func (bs *BlockStore) HasBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error) {
 	HashesOut := &BlockHashes{Hashes: make([]string, 0)}
 	for _, hashIn := range blockHashesIn.Hashes {
-		//bs.mtx.Lock()
+		bs.mtx.Lock()
 		if _, ok := bs.BlockMap[hashIn]; ok {
 			HashesOut.Hashes = append(HashesOut.Hashes, hashIn)
 		}
-		//bs.mtx.Unlock()
+		bs.mtx.Unlock()
 	}
 	return HashesOut, nil
 }
