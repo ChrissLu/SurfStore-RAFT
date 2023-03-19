@@ -129,12 +129,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 }
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
-	if !s.isLeader {
-		return
-	}
-	if s.isCrashed {
-		return
-	}
 
 	//in case of another client call updateFile before this goroutine finished
 	targetInd := s.commitIndex + 1
@@ -155,6 +149,9 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 	// wait in loop for responses
 	for {
 		println("in loop")
+		if s.isCrashed {
+			*s.pendingCommits[pendingInd] <- false
+		}
 		result := <-responses
 		if result {
 			totalAppends++
@@ -175,12 +172,6 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, addr string, responses chan bool) {
 	count := 0
 	for { //keep trying
-		if !s.isLeader {
-			return
-		}
-		if s.isCrashed {
-			return
-		}
 		AppendEntriesInput := AppendEntryInput{
 			Term: s.term,
 			// put the right values
