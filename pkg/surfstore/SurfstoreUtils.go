@@ -85,6 +85,7 @@ func ClientSync(client RPCClient) {
 	if err != nil {
 		fmt.Println("failed:GetFileInfoMap", err.Error())
 	}
+	fmt.Println("RemoteMap", RemoteMap)
 
 	// get block store addrs, should not be here if there are more than 1 addrs
 	var addrs []string
@@ -94,18 +95,19 @@ func ClientSync(client RPCClient) {
 		fmt.Println("Error getting remote block store addrs", err.Error())
 	}
 	//println("****************")
-
 	//download
 	for filename, RemoteMetaData := range RemoteMap {
+		println("remote version: ", RemoteMetaData.Version)
+		println("local version: ", LocalMap[filename].Version)
 		err = nil
 		if LocalMetaData, ok := LocalMap[filename]; ok {
 			if RemoteMetaData.Version >= LocalMap[filename].Version {
-				//println(3)
+				println(3)
 				err = downloadFile(client, RemoteMetaData, LocalMetaData, addrs)
 			}
 		} else {
 			LocalMap[filename] = &FileMetaData{}
-			//println(4)
+			println(4)
 			err = downloadFile(client, RemoteMetaData, LocalMap[filename], addrs)
 		}
 
@@ -120,12 +122,12 @@ func ClientSync(client RPCClient) {
 		err = nil
 		if RemoteMetaData, ok := RemoteMap[filename2]; ok {
 			if LocalMetaData.Version > RemoteMetaData.Version {
-				//println(1)
+				println(1)
 				err = uploadFile(client, LocalMetaData, addrs)
 			}
 		} else {
 			//new file in local
-			//println(2)
+			println(2)
 			err = uploadFile(client, LocalMetaData, addrs)
 		}
 		if err != nil {
