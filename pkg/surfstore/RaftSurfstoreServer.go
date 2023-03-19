@@ -129,6 +129,13 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 }
 
 func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
+	if !s.isLeader {
+		return
+	}
+	if s.isCrashed {
+		return
+	}
+
 	//in case of another client call updateFile before this goroutine finished
 	targetInd := s.commitIndex + 1
 	pendingInd := len(s.pendingCommits) - 1
@@ -168,6 +175,9 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, addr string, responses chan bool) {
 	count := 0
 	if !s.isLeader {
+		return
+	}
+	if s.isCrashed {
 		return
 	}
 	for { //keep trying
