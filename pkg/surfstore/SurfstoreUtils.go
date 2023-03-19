@@ -3,7 +3,6 @@ package surfstore
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"reflect"
@@ -14,7 +13,8 @@ func ClientSync(client RPCClient) {
 
 	LocalMap, err := LoadMetaFromMetaFile(client.BaseDir) //return a new local map if not exist
 	if err != nil {
-		log.Fatalln("Error Loading MetaData", err.Error())
+		fmt.Println("Error Loading MetaData", err.Error())
+		os.Exit(1)
 	}
 
 	files, err := ioutil.ReadDir(client.BaseDir)
@@ -22,7 +22,8 @@ func ClientSync(client RPCClient) {
 	// 	println(f.Name())
 	// }
 	if err != nil {
-		log.Fatalln("Error reading files", err.Error())
+		fmt.Println("Error reading files", err.Error())
+		os.Exit(1)
 	}
 
 	var filesNotDeleted []string
@@ -38,7 +39,8 @@ func ClientSync(client RPCClient) {
 		new_BlockHashList := make([]string, BlockNumber)
 		data, err := os.Open(client.BaseDir + "/" + file.Name())
 		if err != nil {
-			log.Fatalln("Error opening file: " + file.Name())
+			fmt.Println("Error opening file: " + file.Name())
+			os.Exit(1)
 		}
 		for i := 0; i < BlockNumber; i++ {
 
@@ -83,21 +85,23 @@ func ClientSync(client RPCClient) {
 	RemoteMap := make(map[string]*FileMetaData)
 	err = client.GetFileInfoMap(&RemoteMap)
 	if err != nil {
-		log.Fatalln("failed:GetFileInfoMap", err.Error())
+		fmt.Println("failed:GetFileInfoMap", err.Error())
+		os.Exit(1)
 	}
-	fmt.Println("RemoteMap", RemoteMap)
+	//fmt.Println("RemoteMap", RemoteMap)
 
 	// get block store addrs, should not be here if there are more than 1 addrs
 	var addrs []string
 	err = client.GetBlockStoreAddrs(&addrs)
 	//fmt.Println(addrs)
 	if err != nil {
-		log.Fatalln("Error getting remote block store addrs", err.Error())
+		fmt.Println("Error getting remote block store addrs", err.Error())
+		os.Exit(1)
 	}
 	//println("****************")
 	//download
 	for filename, RemoteMetaData := range RemoteMap {
-		//println("remote version: ", RemoteMetaData.Version)
+		println(filename)
 		//println("local version: ", LocalMap[filename].Version)
 		err = nil
 		if LocalMetaData, ok := LocalMap[filename]; ok {
@@ -112,7 +116,8 @@ func ClientSync(client RPCClient) {
 		}
 
 		if err != nil {
-			log.Fatalln("Error downloading:", err.Error())
+			fmt.Println("Error downloading:", err.Error())
+			os.Exit(1)
 		}
 	}
 	//println("------------------")
@@ -131,13 +136,15 @@ func ClientSync(client RPCClient) {
 			err = uploadFile(client, LocalMetaData, addrs)
 		}
 		if err != nil {
-			log.Fatalln("Error uploading: ", err.Error())
+			fmt.Println("Error uploading: ", err.Error())
+			os.Exit(1)
 		}
 	}
 	//println("^^^^^^^^^^^^^")
 	err = WriteMetaFile(LocalMap, client.BaseDir)
 	if err != nil {
-		log.Fatalln("Error WriteMetaFile: ", err.Error())
+		fmt.Println("Error WriteMetaFile: ", err.Error())
+		os.Exit(1)
 	}
 
 }
@@ -210,8 +217,9 @@ func uploadFile(client RPCClient, LocalMetaData *FileMetaData, blockAddrs []stri
 
 	// }
 	//fmt.Println("WWWWWWWW")
-	client.UpdateFile(LocalMetaData, &latestVersion)
+	err = client.UpdateFile(LocalMetaData, &latestVersion)
 	if err != nil {
+
 		return err
 	} else if latestVersion == -1 {
 		LocalMetaData.Version = latestVersion

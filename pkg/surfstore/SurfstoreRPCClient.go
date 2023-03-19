@@ -121,6 +121,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 	for _, metaStore := range surfClient.MetaStoreAddrs {
 		conn, err := grpc.Dial(metaStore, grpc.WithInsecure())
 		if err != nil {
+			fmt.Println(err.Error())
 			continue
 		}
 		c := NewRaftSurfstoreClient(conn)
@@ -130,6 +131,7 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 		defer cancel()
 		v, err := c.UpdateFile(ctx, fileMetaData)
 		if err != nil {
+			fmt.Println(err.Error())
 			conn.Close()
 			continue
 		}
