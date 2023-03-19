@@ -31,7 +31,7 @@ func ClientSync(client RPCClient) {
 		if file.Name() == DEFAULT_META_FILENAME || file.IsDir() {
 			continue
 		}
-		println(file.Name())
+		//println(file.Name())
 		BlockNumber := int(math.Ceil(float64(file.Size()) / float64(client.BlockSize)))
 
 		//calculate new hash list
@@ -83,7 +83,7 @@ func ClientSync(client RPCClient) {
 	RemoteMap := make(map[string]*FileMetaData)
 	err = client.GetFileInfoMap(&RemoteMap)
 	if err != nil {
-		log.Println(err.Error())
+		fmt.Println("failed:GetFileInfoMap", err.Error())
 	}
 
 	// get block store addrs, should not be here if there are more than 1 addrs
@@ -91,7 +91,7 @@ func ClientSync(client RPCClient) {
 	err = client.GetBlockStoreAddrs(&addrs)
 	//fmt.Println(addrs)
 	if err != nil {
-		log.Println("Error getting remote block store addrs", err.Error())
+		fmt.Println("Error getting remote block store addrs", err.Error())
 	}
 	//println("****************")
 
@@ -110,7 +110,7 @@ func ClientSync(client RPCClient) {
 		}
 
 		if err != nil {
-			log.Println("Error downloading:", err.Error())
+			fmt.Println("Error downloading:", err.Error())
 		}
 	}
 	//println("------------------")
@@ -129,7 +129,7 @@ func ClientSync(client RPCClient) {
 			err = uploadFile(client, LocalMetaData, addrs)
 		}
 		if err != nil {
-			log.Println("Error uploading: ", err.Error())
+			fmt.Println("Error uploading: ", err.Error())
 		}
 	}
 	//println("^^^^^^^^^^^^^")
@@ -248,7 +248,7 @@ func downloadFile(client RPCClient, RemoteMetaData *FileMetaData, LocalMetaData 
 	//download blocks from remote
 	for index, hash := range RemoteHashList {
 		if Contains(LocalHashList, hash) {
-			fmt.Println("Contains")
+			//fmt.Println("Contains")
 			continue
 			// data:=make([]byte,client.BlockSize)
 			// n,_:=file.ReadAt(data,int64(index)*int64(client.BlockSize))

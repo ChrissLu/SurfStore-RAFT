@@ -2,8 +2,8 @@ package surfstore
 
 import (
 	context "context"
+	"fmt"
 	"time"
-	//"fmt"
 
 	grpc "google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -96,109 +96,100 @@ func (surfClient *RPCClient) HasBlocks(blockHashesIn []string, blockStoreAddr st
 }
 
 func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileMetaData) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, metaStore := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(metaStore, grpc.WithInsecure())
+		if err != nil {
+			continue
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	FIM, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
-	if err != nil {
-		conn.Close()
-		println(err.Error())
-		return err
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		FIM, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
+		if err != nil {
+			conn.Close()
+			continue
+		}
+		*serverFileInfoMap = FIM.FileInfoMap
+		return conn.Close()
 	}
-	*serverFileInfoMap = FIM.FileInfoMap
-	return conn.Close()
+	return fmt.Errorf("cluster down, no leader found")
 }
 
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, metaStore := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(metaStore, grpc.WithInsecure())
+		if err != nil {
+			continue
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	v, err := c.UpdateFile(ctx, fileMetaData)
-	if err != nil {
-		conn.Close()
-		return err
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		v, err := c.UpdateFile(ctx, fileMetaData)
+		if err != nil {
+			conn.Close()
+			continue
+		}
+		*latestVersion = v.Version
+		//fmt.Println(77777)
+		return conn.Close()
 	}
-	*latestVersion = v.Version
-	//fmt.Println(77777)
-	return conn.Close()
+	return fmt.Errorf("cluster down, no leader found")
 }
 
-// func (surfClient *RPCClient) GetBlockStoreAddr(blockStoreAddr *string) error {
-// 	//onn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithTransportCredentials(insecure.NewCredentials()))
-// 	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-// 	if err != nil {
-// 		return err
-// 	}
-// 	c := NewRaftSurfstoreClient(conn)
-
-// 	// perform the call
-// 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-// 	defer cancel()
-// 	b, err := c.GetBlockStoreAddr(ctx, &emptypb.Empty{})
-// 	if err != nil {
-// 		conn.Close()
-// 		return err
-// 	}
-// 	*blockStoreAddr = b.Addr
-// 	return conn.Close()
-// }
-
 func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStoreMap *map[string][]string) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, metaStore := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(metaStore, grpc.WithInsecure())
+		if err != nil {
+			continue
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	bsm, err := c.GetBlockStoreMap(ctx, &BlockHashes{Hashes: blockHashesIn})
-	if err != nil {
-		conn.Close()
-		//print("222222222222222")
-		println(err.Error())
-		return err
-	}
-	tempMap := make(map[string][]string)
-	for server := range bsm.BlockStoreMap {
-		tempMap[server] = bsm.BlockStoreMap[server].Hashes
-	}
-	*blockStoreMap = tempMap
-	return conn.Close()
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		bsm, err := c.GetBlockStoreMap(ctx, &BlockHashes{Hashes: blockHashesIn})
+		if err != nil {
+			//print("222222222222222")
+			//fmt.Println("failed to GetBlockStoreMap in client", err.Error())
+			conn.Close()
+			continue
+		}
+		tempMap := make(map[string][]string)
+		for server := range bsm.BlockStoreMap {
+			tempMap[server] = bsm.BlockStoreMap[server].Hashes
+		}
+		*blockStoreMap = tempMap
+		return conn.Close()
 
+	}
+	return fmt.Errorf("cluster down, no leader found")
 }
 
 func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, metaStore := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(metaStore, grpc.WithInsecure())
+		if err != nil {
+			continue
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	a, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
-	if err != nil {
-		conn.Close()
-		return err
-	}
-	*blockStoreAddrs = a.BlockStoreAddrs
+		// perform the call
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		a, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
+		if err != nil {
+			conn.Close()
+			continue
+		}
+		*blockStoreAddrs = a.BlockStoreAddrs
 
-	return conn.Close()
+		return conn.Close()
+	}
+	return fmt.Errorf("cluster down, no leader found")
 }
 
 // This line guarantees all method for RPCClient are implemented
