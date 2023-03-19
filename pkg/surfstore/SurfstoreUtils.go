@@ -83,7 +83,7 @@ func ClientSync(client RPCClient) {
 	RemoteMap := make(map[string]*FileMetaData)
 	err = client.GetFileInfoMap(&RemoteMap)
 	if err != nil {
-		fmt.Println("failed:GetFileInfoMap", err.Error())
+		log.Fatalln("failed:GetFileInfoMap", err.Error())
 	}
 	fmt.Println("RemoteMap", RemoteMap)
 
@@ -92,13 +92,13 @@ func ClientSync(client RPCClient) {
 	err = client.GetBlockStoreAddrs(&addrs)
 	//fmt.Println(addrs)
 	if err != nil {
-		fmt.Println("Error getting remote block store addrs", err.Error())
+		log.Fatalln("Error getting remote block store addrs", err.Error())
 	}
 	//println("****************")
 	//download
 	for filename, RemoteMetaData := range RemoteMap {
-		println("remote version: ", RemoteMetaData.Version)
-		println("local version: ", LocalMap[filename].Version)
+		//println("remote version: ", RemoteMetaData.Version)
+		//println("local version: ", LocalMap[filename].Version)
 		err = nil
 		if LocalMetaData, ok := LocalMap[filename]; ok {
 			if RemoteMetaData.Version >= LocalMap[filename].Version {
@@ -112,7 +112,7 @@ func ClientSync(client RPCClient) {
 		}
 
 		if err != nil {
-			fmt.Println("Error downloading:", err.Error())
+			log.Fatalln("Error downloading:", err.Error())
 		}
 	}
 	//println("------------------")
@@ -131,11 +131,14 @@ func ClientSync(client RPCClient) {
 			err = uploadFile(client, LocalMetaData, addrs)
 		}
 		if err != nil {
-			fmt.Println("Error uploading: ", err.Error())
+			log.Fatalln("Error uploading: ", err.Error())
 		}
 	}
 	//println("^^^^^^^^^^^^^")
-	WriteMetaFile(LocalMap, client.BaseDir)
+	err = WriteMetaFile(LocalMap, client.BaseDir)
+	if err != nil {
+		log.Fatalln("Error WriteMetaFile: ", err.Error())
+	}
 
 }
 

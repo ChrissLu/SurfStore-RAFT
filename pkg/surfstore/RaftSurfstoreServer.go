@@ -198,8 +198,8 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, add
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		//print(9)
-		fmt.Println("appending from ", s.serverId, " to ", addr)
-		fmt.Println("lastApplied: ", s.lastApplied, " commitIndex ", s.commitIndex)
+		// fmt.Println("appending from ", s.serverId, " to ", addr)
+		// fmt.Println("lastApplied: ", s.lastApplied, " commitIndex ", s.commitIndex)
 		output, err := client.AppendEntries(ctx, &AppendEntriesInput)
 		if err != nil {
 			//print(9)
@@ -213,7 +213,7 @@ func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, add
 		//println(9)
 		//  check output
 		if output != nil && output.Success {
-			fmt.Println("appending from ", s.serverId, " to ", addr, "succeed")
+			//fmt.Println("appending from ", s.serverId, " to ", addr, "succeed")
 			responses <- true
 			return
 		}
