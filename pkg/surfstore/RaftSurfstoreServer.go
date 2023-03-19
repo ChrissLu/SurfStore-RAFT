@@ -174,13 +174,13 @@ func (s *RaftSurfstore) sendToAllFollowersInParallel(ctx context.Context) {
 
 func (s *RaftSurfstore) sendToFollower(ctx context.Context, targetInd int64, addr string, responses chan bool) {
 	count := 0
-	if !s.isLeader {
-		return
-	}
-	if s.isCrashed {
-		return
-	}
 	for { //keep trying
+		if !s.isLeader {
+			return
+		}
+		if s.isCrashed {
+			return
+		}
 		AppendEntriesInput := AppendEntryInput{
 			Term: s.term,
 			// put the right values
